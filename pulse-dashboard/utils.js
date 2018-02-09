@@ -21,8 +21,14 @@ module.exports = {
     },
     getFilterdMap: (data,key,filterName) => {
         let statMap = new Map
-        data.forEach(function (elem) {
+        //console.log('data is ' + JSON.stringify(data))
+        //let arr = JSON.parse(JSON.stringify(data))
+        //console.log(arr);
+        data.forEach(elem => {
+            //console.log('stringify elem is '+ JSON.stringify(elem))
+                
             let val = elem[key]
+            //console.log('val - '+val)
             if(filterName && filterName != val){
                 return
             }

@@ -1,4 +1,4 @@
-const queries = require('./queries')
+//const queries = require('./queries')
 const utils = require('./utils')
 
 const {
@@ -21,7 +21,8 @@ const ClientSummary = new GraphQLObjectType({
         pageViews: {
             type: GraphQLInt,
             resolve: data => data.pageviews
-        }
+        },
+        
     })
 })
 
@@ -41,7 +42,7 @@ const ClientType = new GraphQLObjectType({
                 }
             },
             resolve: (data, args) => {
-                let statMap = utils.getFilterdMap(data, 'tr_country', args.name)
+                let statMap = utils.getFilterdMap(data[0], 'tr_country', args.name)
                 return utils.mapToArray(statMap, args.threshold)
             }
         },
@@ -56,7 +57,7 @@ const ClientType = new GraphQLObjectType({
                 }
             },
             resolve: (data, args) => {
-                let statMap = utils.getFilterdMap(data, 'dvce_type', args.name)
+                let statMap = utils.getFilterdMap(data[0], 'dvce_type', args.name)
                 return utils.mapToArray(statMap, args.threshold)
             }
         },
@@ -71,7 +72,7 @@ const ClientType = new GraphQLObjectType({
                 }
             },
             resolve: (data, args) => {
-                let statMap = utils.getFilterdMap(data, 'br_name', args.name)
+                let statMap = utils.getFilterdMap(data[0], 'br_name', args.name)
                 return utils.mapToArray(statMap, args.threshold)
             }
         },
@@ -86,7 +87,7 @@ const ClientType = new GraphQLObjectType({
                 }
             },
             resolve: (data, args) => {
-                let statMap = utils.getFilterdMap(data, 'geo_region_name', args.name)
+                let statMap = utils.getFilterdMap(data[0], 'geo_region_name', args.name)
                 return utils.mapToArray(statMap, args.threshold)
             }
         },
@@ -312,7 +313,8 @@ module.exports = new GraphQLSchema({
                         type: GraphQLString
                     }
                 },
-                resolve: (root, args) => queries.clientsQuery(args.startDate, args.endDate)
+                resolve: (root, args, context) => context.clientsQuery(args.startDate, args.endDate)
+                //context.clientsLoader.loadMany([[args.startDate, args.endDate]])
             },
             client: {
                 type: ClientType,
@@ -327,7 +329,7 @@ module.exports = new GraphQLSchema({
                         type: GraphQLString
                     }
                 },
-                resolve: (root, args) => queries.clientQuery(args.app_id, args.startDate, args.endDate)
+                resolve: (root, args, context) => context.clientLoader.loadMany([[args.app_id, args.startDate, args.endDate]])
             },
             status: {
                 type: new GraphQLList(StatusType),
@@ -336,7 +338,8 @@ module.exports = new GraphQLSchema({
                         type: GraphQLString
                     }
                 },
-                resolve: (root, args) => queries.statusQuery(args.startDate)
+                resolve: (root, args, context) => context.statusQuery(args.startDate)
+                   //context.statusLoader.loadMany([[args.startDate]]) 
             },
         })
     })
