@@ -21,7 +21,8 @@ const queryTemplates = {
     clientDataQueryTemplate : 'select app_id, platform, tr_country, dvce_type, br_name, geo_region_name, count(1) from atomic.events ' +
     'where app_id = ANY ($1) and derived_tstamp between ($2) and ($3) group by 1,2,3,4,5,6',
     statusQueryTemplate : 'select * from atomic.manifest where to_char(commit_tstamp,\'yyyy-mm-dd\') >= ($1)',
-    clientsQueryTemplate : 'select app_id, count(1) as pageViews from atomic.events where derived_tstamp between {$1} and {$2} group by 1',
+    allClientsQueryTemplate : 'select app_id, count(1) as pageViews from atomic.events where derived_tstamp between ($1) and ($2) group by 1',
+    filteredClientsQueryTemplate : 'select app_id, count(1) as pageViews from atomic.events where derived_tstamp between ($1) and ($2) and app_id = ANY ($3) group by 1',
     addToCartQueryTemplate : 'select count(1) as total, e.platform, a.sku, a.name, a.category, a.unit_price from' +
     ' atomic.com_snowplowanalytics_snowplow_add_to_cart_1 a, atomic.events e where e.app_id = ANY ($1) and a.root_tstamp' +
     ' between ($2) and ($3) and e.event_id=a.root_id group by 2,3,4,5,6 order by total desc',
@@ -58,8 +59,20 @@ const statusLoader = new DataLoader(keys => Promise.all(keys.map(queryParam => s
                 .catch(error => console.log(error))
             ]
 })})
- */    
-const clientsQuery = (startDate, endDate) => db.query(queryTemplates.clientsQueryTemplate, [startDate, endDate])
+ */
+
+const getClientsQuery = app_ids => {
+    if(app_ids) {
+        console.log(' 1 -> '+ app_ids)
+        return queryTemplates.filteredClientsQueryTemplate
+    }else {
+        console.log(' 2 -> '+ app_ids)
+        return queryTemplates.allClientsQueryTemplate
+    }
+}
+
+const clientsQuery = (startDate, endDate, app_ids) => db.query(
+    getClientsQuery(app_ids), [startDate, endDate, app_ids])
     .then(response => {
         let app_ids = response.map(elem => elem.app_id)
             .filter((element, index, array) => index == array.indexOf(element))
@@ -73,7 +86,7 @@ const clientsQuery = (startDate, endDate) => db.query(queryTemplates.clientsQuer
             .catch(error => console.log(error))
     })
 
-const clientsLoader = new DataLoader(keys => Promise.all(keys.map(queryParam => clientsQuery(queryParam[0], queryParam[1]).then(response => response))))
+const clientsLoader = new DataLoader(keys => Promise.all(keys.map(queryParam => clientsQuery(queryParam[0], queryParam[1], queryParam[2]).then(response => response))))
 
 const clientQuery = (app_id, startDate, endDate) => db.query(queryTemplates.clientDataQueryTemplate, [app_id, startDate, endDate]).then(response => response)
 const clientLoader = new DataLoader(keys =>  Promise.all(queryParam => clientQuery(queryParam[0], queryParam[1], queryParam[2])))

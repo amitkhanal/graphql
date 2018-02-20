@@ -377,7 +377,13 @@ module.exports = new GraphQLSchema({
                         type: new GraphQLList(GraphQLString)
                     }   
                 },
-                resolve: (root, args, context) => context.clientsLoader.load([args.startDate, args.endDate])
+                resolve: (root, args, context) => {
+                    let clients
+                    if(args.app_ids) {
+                        clients = args.app_ids[0].split(',')
+                    }
+                    return context.clientsLoader.load([args.startDate, args.endDate, clients])
+                }
             },
             client: {
                 type: ClientType,
@@ -402,7 +408,6 @@ module.exports = new GraphQLSchema({
                     }
                 },
                 resolve: (root, args, context) => context.statusLoader.load([args.startDate])
-                   //context.statusLoader.loadMany([[args.startDate]]) 
             },
         })
     })
