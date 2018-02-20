@@ -401,7 +401,7 @@ module.exports = new GraphQLSchema({
                         type: GraphQLString
                     }
                 },
-                resolve: (root, args, context) => context.statusQuery(args.startDate)
+                resolve: (root, args, context) => context.statusLoader.load([args.startDate])
                    //context.statusLoader.loadMany([[args.startDate]]) 
             },
         })

@@ -20,7 +20,7 @@ const pgPromiseOptions = {
 const queryTemplates = {
     clientDataQueryTemplate : 'select app_id, platform, tr_country, dvce_type, br_name, geo_region_name, count(1) from atomic.events ' +
     'where app_id = ANY ($1) and derived_tstamp between ($2) and ($3) group by 1,2,3,4,5,6',
-    statusQueryTemplate : 'select * from atomic.manifest where to_char(commit_tstamp,\'yyyy-mm-dd\') >= {$1}',
+    statusQueryTemplate : 'select * from atomic.manifest where to_char(commit_tstamp,\'yyyy-mm-dd\') >= ($1)',
     clientsQueryTemplate : 'select app_id, count(1) as pageViews from atomic.events where derived_tstamp between {$1} and {$2} group by 1',
     addToCartQueryTemplate : 'select count(1) as total, e.platform, a.sku, a.name, a.category, a.unit_price from' +
     ' atomic.com_snowplowanalytics_snowplow_add_to_cart_1 a, atomic.events e where e.app_id = ANY ($1) and a.root_tstamp' +
@@ -44,8 +44,8 @@ const db = pgp(cn)
 
 //pgMonitor.attach(pgPromiseOptions, ['query', 'error']);
 
-const statusQuery = startDate => db.query(queryTemplates.statusQueryTemplate, values).then(response => response)
-const statusLoader = new DataLoader(keys => Promise.all(keys.map(queryParam => statusQuery(keys[0]).then(response => response))))
+const statusQuery = startDate => db.query(queryTemplates.statusQueryTemplate, [startDate]).then(response => response)
+const statusLoader = new DataLoader(keys => Promise.all(keys.map(queryParam => statusQuery(queryParam[0]).then(response => response))))
 
 /* const clientsQuery = (startDate, endDate) => db.task('my-task', t => {
     return t.any(queryTemplates.clientsQueryTemplate, [startDate, endDate])
@@ -66,7 +66,6 @@ const clientsQuery = (startDate, endDate) => db.query(queryTemplates.clientsQuer
         return db.query(queryTemplates.clientDataQueryTemplate, [app_ids, startDate, endDate])
             .then(data => response.map( (elem, index) => {
                 elem.stat = data
-               // elem.app_ids = app_ids
                 elem.startDate = startDate
                 elem.endDate = endDate
                 return elem
