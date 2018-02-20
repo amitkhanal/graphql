@@ -15,33 +15,68 @@ module.exports = {
         map.forEach((value, key) => {
             if(threshold && !(value >= threshold))
                 return
-            list.push(key + '==>' + value)
+            list.push({key:key,value:value})
         })
         return list
     },
-    getFilterdMap: (data,key,filterName) => {
+    getFilterdMap: (data, app_id, key, filterName) => {
         let statMap = new Map
-        //console.log('data is ' + JSON.stringify(data))
-        //let arr = JSON.parse(JSON.stringify(data))
-        //console.log(arr);
         data.forEach(elem => {
-            //console.log('stringify elem is '+ JSON.stringify(elem))
-                
             let val = elem[key]
-            //console.log('val - '+val)
-            if(filterName && filterName != val){
+            if (app_id != elem.app_id) {
+                return
+            }
+            if (filterName && filterName != val && filterName != 'unknown') {
                 return
             }
             else if (val == null) {
                 val = 'unknown'
             }
+            let total=0
+            let regionMap
             if (statMap.has(val)) {
-                let total = statMap.get(val) + +elem.count
-                statMap.set(val, total)
+                total = +statMap.get(val).count + +elem.count
+                statMap.get(val).count = +total
+                regionMap = statMap.get(val).regions
+                if(regionMap.has(elem.geo_region_name)){
+                    regionMap.set(elem.geo_region_name, + regionMap.get(elem.geo_region_name) + +elem.count)
+                }else{
+                    regionMap.set(elem.geo_region_name, +elem.count)
+                }
+                
             } else {
-                statMap.set(val, +elem.count)
+                total += +elem.count
+                let obj = {count:total}
+                statMap.set(val, obj)
+                if(!statMap.get(val).regions){
+                    regionMap = new Map
+                    regionMap.set(elem.geo_region_name, elem.count)
+                    statMap.get(val).regions = regionMap
+                }else {
+                    regionMap = statMap.get(val).regions
+                    statMap.get(val).regions.set(elem.geo_region_name, +regionMap.get(elem.geo_region_name) + +elem.count)
+                }
             }
+            
         })
         return statMap
     }
+/* 
+    convertArrayToString: (array) => {
+        let output=''
+        console.log('array ' + array)
+        //console.log("@@@ " + JSON.stringify(array).split(','))
+        //console.log('join > ' + array.map(element => '"'))
+       
+        array.forEach(element => {
+            output += '\''+element+'\''+','
+            //console.log('\n**** - ' + output)
+            //output += element+','
+        }) 
+        //output = array.join(',')
+        output = ('\''+array.join('\',')+'\'')
+        console.log('oout  ' + output)
+        return output
+    } */
 }
+

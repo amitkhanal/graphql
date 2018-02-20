@@ -6,14 +6,15 @@ const app = express()
 
 const schema = require('./schema')
 
-app.use('/pulse4', graphqlHTTP({
+app.use('/pulse', graphqlHTTP({
     schema,
     graphiql: true,
     context: {
-        statusQuery: queries.statusQuery,
-        clientsQuery: queries.clientsQuery,
+        statusLoader: queries.statusLoader,
+        clientsLoader: queries.clientsLoader,
         clientLoader: queries.clientLoader,
-        addToCartLoader: queries.addToCartLoader
+        addToCartLoader: queries.addToCartLoader,
+        searchLoader: queries.searchLoader
     }
 }))
 

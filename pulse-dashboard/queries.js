@@ -1,6 +1,7 @@
 const promise = require('bluebird')
 const pgMonitor = require('pg-monitor')
 const DataLoader = require('dataloader')
+const utils = require('./utils')
 
 const options = {
     // Initialization Options
@@ -16,16 +17,20 @@ const pgPromiseOptions = {
     }
 }
 
-const statusQueryTemplate = 'select * from atomic.manifest where to_char(commit_tstamp,\'yyyy-mm-dd\') >= ${startDate}'
-const clientsQueryTemplate = 'select app_id, count(1) as pageViews from atomic.events where derived_tstamp between ${startDate} and ${endDate} group by 1'
-const clientDataQueryTemplate = 'select platform, tr_country, dvce_type, br_name, geo_region_name, count(1) from atomic.events ' +
-    'where app_id = ${app_id} and derived_tstamp between ${startDate} and ${endDate} group by 1,2,3,4,5'
-const addToCartQueryTemplate = 'select count(1) as total, e.platform, a.sku, a.name, a.category, a.unit_price from' +
-    'atomic.com_snowplowanalytics_snowplow_add_to_cart_1 a, atomic.events e where e.app_id like ${app_id} and a.root_tstamp' +
-    'between ${startDate} and ${endDate} and e.event_id=a.root_id group by 2,3,4,5,6 order by total desc'
+const queryTemplates = {
+    clientDataQueryTemplate : 'select app_id, platform, tr_country, dvce_type, br_name, geo_region_name, count(1) from atomic.events ' +
+    'where app_id = ANY ($1) and derived_tstamp between ($2) and ($3) group by 1,2,3,4,5,6',
+    statusQueryTemplate : 'select * from atomic.manifest where to_char(commit_tstamp,\'yyyy-mm-dd\') >= {$1}',
+    clientsQueryTemplate : 'select app_id, count(1) as pageViews from atomic.events where derived_tstamp between {$1} and {$2} group by 1',
+    addToCartQueryTemplate : 'select count(1) as total, e.platform, a.sku, a.name, a.category, a.unit_price from' +
+    ' atomic.com_snowplowanalytics_snowplow_add_to_cart_1 a, atomic.events e where e.app_id = ANY ($1) and a.root_tstamp' +
+    ' between ($2) and ($3) and e.event_id=a.root_id group by 2,3,4,5,6 order by total desc',
+    searchQueryTemplate : 'select e.platform, s.terms, s.total_results, count(1) as total from atomic.events e, com_snowplowanalytics_snowplow_site_search_1 s '+
+    'where e.event_id = s.root_id and e.app_id = ($1) and e.derived_tstamp between ($2) and ($3) group by 1,2,3'
+}   
 
-//const pgp = require('pg-promise')(pgPromiseOptions)
-const pgp = require('pg-promise')(options)
+const pgp = require('pg-promise')(pgPromiseOptions)
+//const pgp = require('pg-promise')(options)
 const cn = {
     host: process.env.db_host,
     port: process.env.db_port,
@@ -34,134 +39,59 @@ const cn = {
     password: process.env.db_password
 }
 
-
 const db = pgp(cn)
 
 
 //pgMonitor.attach(pgPromiseOptions, ['query', 'error']);
 
-//const values
+const statusQuery = startDate => db.query(queryTemplates.statusQueryTemplate, values).then(response => response)
+const statusLoader = new DataLoader(keys => Promise.all(keys.map(queryParam => statusQuery(keys[0]).then(response => response))))
 
-/* db.query('select platform, tr_country, dvce_type, br_name, geo_region_name, count(1) from atomic.events where derived_tstamp > \'2018-01-20\' group by 1,2,3,4,5')
-.then(response => JSON.parse(JSON.stringify(response)) )
-.then(data => {
-    console.log(
-     data
-     .filter((elem, index, array) => {
-        return elem.br_name == 'Chrome'
-     }).map((elem) => {
-        console.log(elem.count)
-        return elem.count
-     }).reduce( (total, elem ) => {
-        return total = +total + +elem
-        //console.log(total)
-     })
-)}) */
-
-/* db.query('select platform, tr_country, dvce_type, br_name, geo_region_name, count(1) from atomic.events where derived_tstamp > \'2018-01-20\' group by 1,2,3,4,5')
-.then(response => JSON.parse(JSON.stringify(response)) )
-.then(data => {
-    let statMap = new Map()
-    statMap.set('country',[])
-    statMap.set('device',[])
-    statMap.set('browser',[])
-    statMap.set('geoRegion',[])
-
-    data.forEach(function (value){
-        statMap.get('country').push(value.tr_country)
-        statMap.get('device').push(value.dvce_type)
-        statMap.get('browser').push(value.br_name)
-        statMap.get('browser').push(value.geo_region_name)
+/* const clientsQuery = (startDate, endDate) => db.task('my-task', t => {
+    return t.any(queryTemplates.clientsQueryTemplate, [startDate, endDate])
+    .then(response => {
+        let app_ids = response.map(elem => elem.app_id).filter((element, index, array) => index == array.indexOf(element))
+        //return [clientsResponse[0],
+        return [response, 
+            t.any(queryTemplates.clientDataQueryTemplate, [app_ids, startDate, endDate])
+                .then(data => data)
+                .catch(error => console.log(error))
+            ]
+})})
+ */    
+const clientsQuery = (startDate, endDate) => db.query(queryTemplates.clientsQueryTemplate, [startDate, endDate])
+    .then(response => {
+        let app_ids = response.map(elem => elem.app_id)
+            .filter((element, index, array) => index == array.indexOf(element))
+        return db.query(queryTemplates.clientDataQueryTemplate, [app_ids, startDate, endDate])
+            .then(data => response.map( (elem, index) => {
+                elem.stat = data
+               // elem.app_ids = app_ids
+                elem.startDate = startDate
+                elem.endDate = endDate
+                return elem
+            }))
+            .catch(error => console.log(error))
     })
-    //console.log(statMap)
-    return statMap
-}) */
 
-const statusQuery = startDate => {
-    let values = {
-        'startDate': startDate
-    }
-    return db.query(statusQueryTemplate, values)
-        .then(response => response)
-    //.finally(db.$pool.end)
-}
+const clientsLoader = new DataLoader(keys => Promise.all(keys.map(queryParam => clientsQuery(queryParam[0], queryParam[1]).then(response => response))))
 
-const statusLoader = new DataLoader(keys => 
-    Promise.all(keys.map(queryParam => 
-        db.query(statusQueryTemplate, { startDate: queryParam[0] })
-            .then(response => {
-                //console.log(JSON.parse(JSON.stringify(response)))
-                //return JSON.parse(JSON.stringify(response))
-                return response
-            })
-    ))
-)
+const clientQuery = (app_id, startDate, endDate) => db.query(queryTemplates.clientDataQueryTemplate, [app_id, startDate, endDate]).then(response => response)
+const clientLoader = new DataLoader(keys =>  Promise.all(queryParam => clientQuery(queryParam[0], queryParam[1], queryParam[2])))
 
-const clientsQuery = (startDate, endDate) => {
-    let values = {
-        'startDate': startDate,
-        'endDate': endDate
-    }
-    return db.query(clientsQueryTemplate, values)
-        .then(response => response)
-}
+const addToCartQuery = (app_ids, startDate, endDate) => db.query(queryTemplates.addToCartQueryTemplate, [app_ids, startDate, endDate])
+    .then(response => response)
+const addToCartLoader = new DataLoader(keys => Promise.all(keys.map(queryParam => addToCartQuery(queryParam[0], queryParam[1], queryParam[2]))))
 
-const clientsLoader = new DataLoader(keys =>
-    Promise.all(keys.map(queryParam =>
-         db.query(clientsQueryTemplate, {startDate: queryParam[0], endDate: queryParam[1]})
-            .then(response => response
-               // console.log(JSON.parse(JSON.stringify(response)))
-                //return JSON.parse(JSON.stringify(response))
-            )
-    ))
-)
-
-/* const clientQuery = queryParam => {
-        db.query(clientDataQueryTemplate, queryParam)
-                             .then(response => {
-                                 console.log(JSON.parse(JSON.stringify(response)))
-                                 return JSON.parse(JSON.stringify(response))
-                             })
-} */
-
-/* const clientLoader = new DataLoader(keys => {
-
-    let values = keys.map(key => {
-        return {
-            app_id: key[0],
-            startDate: key[1],
-            endDate: key[2]
-        }
-    })
-    return Promise.all(values.map(clientQuery))
-}) */
-
-const clientLoader = new DataLoader( keys =>
-     Promise.all(keys.map(queryParam => 
-        db.query(clientDataQueryTemplate, { app_id: queryParam[0], startDate: queryParam[1], endDate: queryParam[2] })
-            .then(response => response
-                
-            )
-    ))
-)
-
-const addToCartQuery = (app_id, startDate, endDate) => {
-    let values = {
-        'app_id': app_id,
-        'startDate': startDate,
-        'endDate': endDate
-    }
-    return db.query(addToCartQueryTemplate, values)
-        .then(response => JSON.parse(JSON.stringify(response)))
-}
-
-const addToCartLoader = new DataLoader(keys => {
-    return Promise.all(keys.map(addToCartQuery))
-})
+const searchQuery = (app_id, startDate, endDate) => db.query(queryTemplates.searchQueryTemplate, [app_id, startDate, endDate])
+    .then(response => response)
+const searchLoader = new DataLoader(keys => Promise.all(keys.map(queryParam => searchQuery(queryParam[0], queryParam[1], queryParam[2]
+))))
 
 module.exports = {
-    clientLoader,
     addToCartLoader,
-    statusQuery,
-    clientsQuery
+    statusLoader,
+    clientsLoader,
+    clientLoader,
+    searchLoader
 }

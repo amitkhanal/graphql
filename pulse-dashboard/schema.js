@@ -1,4 +1,3 @@
-//const queries = require('./queries')
 const utils = require('./utils')
 
 const {
@@ -9,8 +8,8 @@ const {
     GraphQLString
 } = require('graphql')
 
-const ClientSummary = new GraphQLObjectType({
-    name: 'ClientSummary',
+const ClientType = new GraphQLObjectType({
+    name: 'ClientType',
     description: '...',
 
     fields: () => ({
@@ -22,15 +21,6 @@ const ClientSummary = new GraphQLObjectType({
             type: GraphQLInt,
             resolve: data => data.pageviews
         },
-        
-    })
-})
-
-const ClientType = new GraphQLObjectType({
-    name: 'ClientType',
-    description: '...',
-
-    fields: () => ({
         countryStat: {
             type: new GraphQLList(CountryStatType),
             args: {
@@ -41,9 +31,10 @@ const ClientType = new GraphQLObjectType({
                     type: GraphQLInt
                 }
             },
-            resolve: (data, args) => {
-                let statMap = utils.getFilterdMap(data[0], 'tr_country', args.name)
-                return utils.mapToArray(statMap, args.threshold)
+            resolve: (data, args, context) => {
+                //TODO make name and threshold to be handled via same function
+                let countryMap = utils.getFilterdMap(data.stat,data.app_id,'tr_country',args.name)
+                return utils.mapToArray(countryMap,args.threshold)
             }
         },
         deviceStat: {
@@ -57,7 +48,7 @@ const ClientType = new GraphQLObjectType({
                 }
             },
             resolve: (data, args) => {
-                let statMap = utils.getFilterdMap(data[0], 'dvce_type', args.name)
+                let statMap = utils.getFilterdMap(data.stat,data.app_id,'dvce_type', args.name)
                 return utils.mapToArray(statMap, args.threshold)
             }
         },
@@ -72,28 +63,14 @@ const ClientType = new GraphQLObjectType({
                 }
             },
             resolve: (data, args) => {
-                let statMap = utils.getFilterdMap(data[0], 'br_name', args.name)
-                return utils.mapToArray(statMap, args.threshold)
-            }
-        },
-        regionStat: {
-            type: new GraphQLList(RegionStatType),
-            args: {
-                name: {
-                    type: GraphQLString
-                },
-                threshold: {
-                    type: GraphQLInt
-                }
-            },
-            resolve: (data, args) => {
-                let statMap = utils.getFilterdMap(data[0], 'geo_region_name', args.name)
-                return utils.mapToArray(statMap, args.threshold)
+                let statMap = utils.getFilterdMap(data.stat,data.app_id,'br_name',args.name)
+                return utils.mapToArray(statMap,args.threshold)
+
             }
         },
         addToCartStat: {
             type: AddToCartStatType,
-            resolve: data => console.log(JSON.stringify(data))
+            resolve: (data, args, context) => context.addToCartLoader.load([[data.app_id], data.startDate, data.endDate])
         },
         searchStat: {
             type: SearchStatType,
@@ -102,16 +79,7 @@ const ClientType = new GraphQLObjectType({
                     type: GraphQLString
                 }
             },
-            resolve: () => console.log
-        },
-        topSearchKeywordsStat: {
-            type: TopSearchKeywordsStatType,
-            args: {
-                app_id: {
-                    type: GraphQLString
-                }
-            },
-            resolve: () => console.log
+            resolve: (data, args, context) => context.searchLoader.load([data.app_id, data.startDate, data.endDate])
         }
     })
 })
@@ -123,11 +91,23 @@ const CountryStatType = new GraphQLObjectType({
     fields: () => ({
         country: {
             type: GraphQLString,
-            resolve: data => data.substring(0, data.indexOf('==>'))
+            resolve: data => data.key
         },
         count: {
             type: GraphQLInt,
-            resolve: data => data.substring((data.indexOf('==>') + 3), data.length)
+            resolve: data => data.value.count
+        },
+        regions: {
+            type: new GraphQLList(RegionStatType),
+            args: {
+                name: {
+                    type: GraphQLString
+                },
+                threshold: {
+                    type: GraphQLInt
+                }
+            },
+            resolve: data => utils.mapToArray(data.value.regions)
         }
     })
 })
@@ -139,11 +119,11 @@ const DeviceStatType = new GraphQLObjectType({
     fields: () => ({
         device: {
             type: GraphQLString,
-            resolve: data => data.substring(0, data.indexOf('==>'))
+            resolve: data => data.key
         },
         count: {
             type: GraphQLInt,
-            resolve: data => data.substring((data.indexOf('==>') + 3), data.length)
+            resolve: data => data.value.count
         }
     })
 })
@@ -155,11 +135,11 @@ const BrowserStatType = new GraphQLObjectType({
     fields: () => ({
         browser: {
             type: GraphQLString,
-            resolve: data => data.substring(0, data.indexOf('==>'))
+            resolve: data => data.key
         },
         count: {
             type: GraphQLInt,
-            resolve: data => data.substring((data.indexOf('==>') + 3), data.length)
+            resolve: data => data.value.count
         }
     })
 })
@@ -171,11 +151,11 @@ const RegionStatType = new GraphQLObjectType({
     fields: () => ({
         region: {
             type: GraphQLString,
-            resolve: data => data.substring(0, data.indexOf('==>'))
+            resolve: data => data.key
         },
         count: {
             type: GraphQLInt,
-            resolve: data => data.substring((data.indexOf('==>') + 3), data.length)
+            resolve: data => data.value
         }
     })
 })
@@ -187,11 +167,42 @@ const AddToCartStatType = new GraphQLObjectType({
     fields: () => ({
         channels: {
             type: new GraphQLList(AddToCartChannelType),
-            resolve: data => console.log('dd- ' + data)
+            resolve: data => {
+                let channelMap = new Map
+                data.forEach(element => {
+                    if(channelMap.has(element.platform)){
+                        channelMap.set(element.platform, +channelMap.get(element.platform) + +element.total)
+                    }else {
+                        channelMap.set(element.platform, +element.total)
+                    }
+                })
+                return utils.mapToArray(channelMap)
+            }
         },
         topSkus: {
-            type: GraphQLList(TopSkusStatType),
-            resolve: data => console.log
+            type: new GraphQLList(TopSkusStatType),
+            args: {
+                count: {
+                    type: GraphQLInt
+                }
+            },
+            resolve: (data,args) => {
+                let channelMap = new Map
+                data.forEach(element => {
+                    if(channelMap.has(element.sku)){
+                        channelMap.set(element.sku, +channelMap.get(element.sku).total + +element.total)
+                    }else {
+                        channelMap.set(element.sku, {name: element.name, category: element.category, price: element.unitPrice, count: +element.total})
+                    }
+                })
+                let totalItemsToReturn = channelMap.size
+                if(args && args.count){
+                    totalItemsToReturn = args.count
+                }
+                return utils.mapToArray(channelMap)
+                     .sort( (elem1, elem2) => elem2.value - elem1.value)
+                     .slice(0,args.count)
+            }
         }
     })
 })
@@ -203,11 +214,11 @@ const AddToCartChannelType = new GraphQLObjectType({
     fields: () => ({
         platform: {
             type: GraphQLString,
-            resolve: () => console.log
+            resolve: data => data.key
         },
         count: {
             type: GraphQLInt,
-            resolve: () => console.log
+            resolve: data => data.value
         }
     })
 })
@@ -219,23 +230,23 @@ const TopSkusStatType = new GraphQLObjectType({
     fields: () => ({
         sku: {
             type: GraphQLString,
-            resolve: data => console.log
+            resolve: data => data.key
         },
         count: {
             type: GraphQLInt,
-            resolve: data => console.log
+            resolve: data => data.value.total
         },
         name: {
             type: GraphQLString,
-            resolve: data => console.log
+            resolve: data => data.value.name
         },
         category: {
             type: GraphQLString,
-            resolve: data => console.log
+            resolve: data => data.value.category
         },
         unitPrice: {
             type: GraphQLString,
-            resolve: data => console.log
+            resolve: data => data.value.price
         }
     })
 })
@@ -245,17 +256,67 @@ const SearchStatType = new GraphQLObjectType({
     description: '...',
 
     fields: () => ({
-        channel: {
-            type: GraphQLString,
-            resolve: () => console.log
+        channels: {
+            type: new GraphQLList(SearchChannelType),
+            resolve: (data) => {
+                let channelMap = new Map
+                data.forEach(element => {
+                    if(channelMap.has(element.platform)){
+                        channelMap.set(element.platform, +channelMap.get(element.platform) + +element.total)
+                    }else {
+                        channelMap.set(element.platform, +element.total)
+                    }
+                })
+                return utils.mapToArray(channelMap)
+            }
         },
-        count: {
-            type: GraphQLInt,
-            resolve: () => console.log
+        topSearchKeywordsStat: {
+            type: new GraphQLList(TopSearchKeywordsStatType),
+            args: {
+                count: {
+                    type: GraphQLInt
+                }
+            },
+            resolve: (data,args) => {
+                let channelMap = new Map
+                data.forEach(element => {
+                    let searchTerms = element.terms
+                    if(searchTerms){
+                        searchTerms = searchTerms.substring(2,searchTerms.length-2)
+                    }
+                    if(channelMap.has(searchTerms)){
+                        channelMap.set(searchTerms, +channelMap.get(searchTerms) + +element.total)
+                    }else {
+                        channelMap.set(searchTerms, +element.total)
+                    }
+                })
+                let totalItemsToReturn = channelMap.size
+                if(args && args.count){
+                    totalItemsToReturn = args.count
+                }
+                return utils.mapToArray(channelMap)
+                     .sort( (elem1, elem2) => elem2.value - elem1.value )
+                     .slice(0,args.count)
+            }
         }
     })
 })
 
+const SearchChannelType = new GraphQLObjectType({
+    name: 'SearchChannelType',
+    description: '...',
+
+    fields: () => ({
+        channel: {
+            type: GraphQLString,
+            resolve: data => data.key
+        },
+        count: {
+            type: GraphQLInt,
+            resolve: data => data.value
+        }
+    })
+})
 const TopSearchKeywordsStatType = new GraphQLObjectType({
     name: 'TopSearchKeywordsStatType',
     description: '...',
@@ -263,11 +324,11 @@ const TopSearchKeywordsStatType = new GraphQLObjectType({
     fields: () => ({
         keyword: {
             type: GraphQLString,
-            resolve: () => console.log
+            resolve: data => data.key
         },
         count: {
             type: GraphQLInt,
-            resolve: () => console.log
+            resolve: data => data.value
         }
     })
 })
@@ -304,17 +365,19 @@ module.exports = new GraphQLSchema({
 
         fields: () => ({
             clients: {
-                type: new GraphQLList(ClientSummary),
+                type: new GraphQLList(ClientType),
                 args: {
                     startDate: {
                         type: GraphQLString
                     },
                     endDate: {
                         type: GraphQLString
-                    }
+                    },
+                    app_ids: {
+                        type: new GraphQLList(GraphQLString)
+                    }   
                 },
-                resolve: (root, args, context) => context.clientsQuery(args.startDate, args.endDate)
-                //context.clientsLoader.loadMany([[args.startDate, args.endDate]])
+                resolve: (root, args, context) => context.clientsLoader.load([args.startDate, args.endDate])
             },
             client: {
                 type: ClientType,
