@@ -14,7 +14,8 @@ app.use('/pulse', graphqlHTTP({
         clientsLoader: queries.clientsLoader,
         clientLoader: queries.clientLoader,
         addToCartLoader: queries.addToCartLoader,
-        searchLoader: queries.searchLoader
+        searchLoader: queries.searchLoader,
+        newClientQuery: queries.newClientQuery
     }
 }))
 

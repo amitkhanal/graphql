@@ -5,8 +5,78 @@ const {
     GraphQLList,
     GraphQLObjectType,
     GraphQLSchema,
-    GraphQLString
+    GraphQLString,
+    GraphQLNonNull,
+    GraphQLInputObjectType
 } = require('graphql')
+
+const ClientMutationType = new GraphQLObjectType({
+    name: 'ClientMutationType',
+    description: '...',
+
+    fields: () => ({
+        addClient: {
+            type: KYCClientType,
+            description: 'Create new KYC Client',
+            args: {
+                client: {
+                    type: KYCClientInputType
+                }
+            },
+            resolve: (data, args, context) => context.newClientQuery(args.client)
+        }
+    })
+})
+
+const KYCClientType = new GraphQLObjectType({
+    name: 'KYCClientType',
+    description: '...',
+
+    fields: () => ({
+        client_id: {
+            type: GraphQLString,
+            resolve: data => {
+                return data[0].oe_client_id
+            }
+        },
+        test: {
+            type: GraphQLString,
+            resolve: data => data[0].oe_client_short_name
+        } 
+    })
+})
+
+const KYCClientInputType = new GraphQLInputObjectType({
+    name: 'KYCClientInput',
+    description: '...',
+
+    fields: () => ({
+        id: {
+            type: new GraphQLNonNull(GraphQLString)
+        },
+        name: {
+            type: new GraphQLNonNull(GraphQLString)
+        },
+        shortName: {
+            type: new GraphQLNonNull(GraphQLString)
+        },
+        city: {
+            type: new GraphQLNonNull(GraphQLString)
+        },
+        state: {
+            type: new GraphQLNonNull(GraphQLString)
+        },
+        postalCode: {
+            type: new GraphQLNonNull(GraphQLString)
+        },
+        country: {
+            type: new GraphQLNonNull(GraphQLString)
+        },
+        email: {
+            type: new GraphQLNonNull(GraphQLString)
+        }
+    })
+})
 
 const ClientType = new GraphQLObjectType({
     name: 'ClientType',
@@ -190,7 +260,11 @@ const AddToCartStatType = new GraphQLObjectType({
                 let channelMap = new Map
                 data.forEach(element => {
                     if(channelMap.has(element.sku)){
-                        channelMap.set(element.sku, +channelMap.get(element.sku).total + +element.total)
+                        let total=0
+                        if(channelMap.get(element.sku).count != undefined){
+                            total = +channelMap.get(element.sku).count
+                        }
+                        channelMap.set(element.sku.count, total + +element.total)
                     }else {
                         channelMap.set(element.sku, {name: element.name, category: element.category, price: element.unitPrice, count: +element.total})
                     }
@@ -234,7 +308,7 @@ const TopSkusStatType = new GraphQLObjectType({
         },
         count: {
             type: GraphQLInt,
-            resolve: data => data.value.total
+            resolve: data => data.value.count
         },
         name: {
             type: GraphQLString,
@@ -410,5 +484,6 @@ module.exports = new GraphQLSchema({
                 resolve: (root, args, context) => context.statusLoader.load([args.startDate])
             },
         })
-    })
+    }),
+    mutation: ClientMutationType
 })
