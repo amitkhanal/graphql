@@ -3,7 +3,7 @@ module.exports = {
         const out = [Object.create(null)]
         map.forEach((value, key) => {
             if (value instanceof Map) {
-                out[key] = map_to_object(value)
+                out[key] = mapToObject(value)
             } else {
                 out[key] = value
             }

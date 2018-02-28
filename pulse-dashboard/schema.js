@@ -149,7 +149,7 @@ const ClientType = new GraphQLObjectType({
                     type: GraphQLString
                 }
             },
-            resolve: (data, args, context) => context.searchLoader.load([data.app_id, data.startDate, data.endDate])
+            resolve: (data, args, context) => context.searchLoader.load([[data.app_id], data.startDate, data.endDate])
         }
     })
 })
