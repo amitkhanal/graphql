@@ -42,7 +42,7 @@ const KYCClientType = new GraphQLObjectType({
         test: {
             type: GraphQLString,
             resolve: data => data[0].oe_client_short_name
-        } 
+        }
     })
 })
 
@@ -103,8 +103,8 @@ const ClientType = new GraphQLObjectType({
             },
             resolve: (data, args, context) => {
                 //TODO make name and threshold to be handled via same function
-                let countryMap = utils.getFilterdMap(data.stat,data.app_id,'tr_country',args.name)
-                return utils.mapToArray(countryMap,args.threshold)
+                let countryMap = utils.getFilterdMap(data.stat, data.app_id, 'tr_country', args.name)
+                return utils.mapToArray(countryMap, args.threshold)
             }
         },
         deviceStat: {
@@ -118,7 +118,7 @@ const ClientType = new GraphQLObjectType({
                 }
             },
             resolve: (data, args) => {
-                let statMap = utils.getFilterdMap(data.stat,data.app_id,'dvce_type', args.name)
+                let statMap = utils.getFilterdMap(data.stat, data.app_id, 'dvce_type', args.name)
                 return utils.mapToArray(statMap, args.threshold)
             }
         },
@@ -133,14 +133,16 @@ const ClientType = new GraphQLObjectType({
                 }
             },
             resolve: (data, args) => {
-                let statMap = utils.getFilterdMap(data.stat,data.app_id,'br_name',args.name)
-                return utils.mapToArray(statMap,args.threshold)
+                let statMap = utils.getFilterdMap(data.stat, data.app_id, 'br_name', args.name)
+                return utils.mapToArray(statMap, args.threshold)
 
             }
         },
         addToCartStat: {
             type: AddToCartStatType,
-            resolve: (data, args, context) => context.addToCartLoader.load([[data.app_id], data.startDate, data.endDate])
+            resolve: (data, args, context) => context.addToCartLoader.load([
+                [data.app_id], data.startDate, data.endDate
+            ])
         },
         searchStat: {
             type: SearchStatType,
@@ -149,7 +151,9 @@ const ClientType = new GraphQLObjectType({
                     type: GraphQLString
                 }
             },
-            resolve: (data, args, context) => context.searchLoader.load([[data.app_id], data.startDate, data.endDate])
+            resolve: (data, args, context) => context.searchLoader.load([
+                [data.app_id], data.startDate, data.endDate
+            ])
         }
     })
 })
@@ -240,9 +244,9 @@ const AddToCartStatType = new GraphQLObjectType({
             resolve: data => {
                 let channelMap = new Map
                 data.forEach(element => {
-                    if(channelMap.has(element.platform)){
+                    if (channelMap.has(element.platform)) {
                         channelMap.set(element.platform, +channelMap.get(element.platform) + +element.total)
-                    }else {
+                    } else {
                         channelMap.set(element.platform, +element.total)
                     }
                 })
@@ -256,26 +260,31 @@ const AddToCartStatType = new GraphQLObjectType({
                     type: GraphQLInt
                 }
             },
-            resolve: (data,args) => {
+            resolve: (data, args) => {
                 let channelMap = new Map
                 data.forEach(element => {
-                    if(channelMap.has(element.sku)){
-                        let total=0
-                        if(channelMap.get(element.sku).count != undefined){
+                    if (channelMap.has(element.sku)) {
+                        let total = 0
+                        if (channelMap.get(element.sku).count != undefined) {
                             total = +channelMap.get(element.sku).count
                         }
                         channelMap.set(element.sku.count, total + +element.total)
-                    }else {
-                        channelMap.set(element.sku, {name: element.name, category: element.category, price: element.unitPrice, count: +element.total})
+                    } else {
+                        channelMap.set(element.sku, {
+                            name: element.name,
+                            category: element.category,
+                            price: element.unitPrice,
+                            count: +element.total
+                        })
                     }
                 })
                 let totalItemsToReturn = channelMap.size
-                if(args && args.count){
+                if (args && args.count) {
                     totalItemsToReturn = args.count
                 }
                 return utils.mapToArray(channelMap)
-                     .sort( (elem1, elem2) => elem2.value - elem1.value)
-                     .slice(0,args.count)
+                    .sort((elem1, elem2) => elem2.value - elem1.value)
+                    .slice(0, args.count)
             }
         }
     })
@@ -335,9 +344,9 @@ const SearchStatType = new GraphQLObjectType({
             resolve: (data) => {
                 let channelMap = new Map
                 data.forEach(element => {
-                    if(channelMap.has(element.platform)){
+                    if (channelMap.has(element.platform)) {
                         channelMap.set(element.platform, +channelMap.get(element.platform) + +element.total)
-                    }else {
+                    } else {
                         channelMap.set(element.platform, +element.total)
                     }
                 })
@@ -351,26 +360,26 @@ const SearchStatType = new GraphQLObjectType({
                     type: GraphQLInt
                 }
             },
-            resolve: (data,args) => {
+            resolve: (data, args) => {
                 let channelMap = new Map
                 data.forEach(element => {
                     let searchTerms = element.terms
-                    if(searchTerms){
-                        searchTerms = searchTerms.substring(2,searchTerms.length-2)
+                    if (searchTerms) {
+                        searchTerms = searchTerms.substring(2, searchTerms.length - 2)
                     }
-                    if(channelMap.has(searchTerms)){
+                    if (channelMap.has(searchTerms)) {
                         channelMap.set(searchTerms, +channelMap.get(searchTerms) + +element.total)
-                    }else {
+                    } else {
                         channelMap.set(searchTerms, +element.total)
                     }
                 })
                 let totalItemsToReturn = channelMap.size
-                if(args && args.count){
+                if (args && args.count) {
                     totalItemsToReturn = args.count
                 }
                 return utils.mapToArray(channelMap)
-                     .sort( (elem1, elem2) => elem2.value - elem1.value )
-                     .slice(0,args.count)
+                    .sort((elem1, elem2) => elem2.value - elem1.value)
+                    .slice(0, args.count)
             }
         }
     })
@@ -449,11 +458,11 @@ module.exports = new GraphQLSchema({
                     },
                     app_ids: {
                         type: new GraphQLList(GraphQLString)
-                    }   
+                    }
                 },
                 resolve: (root, args, context) => {
                     let clients
-                    if(args.app_ids) {
+                    if (args.app_ids) {
                         clients = args.app_ids[0].split(',')
                     }
                     return context.clientsLoader.load([args.startDate, args.endDate, clients])
@@ -472,7 +481,9 @@ module.exports = new GraphQLSchema({
                         type: GraphQLString
                     }
                 },
-                resolve: (root, args, context) => context.clientLoader.loadMany([[args.app_id, args.startDate, args.endDate]])
+                resolve: (root, args, context) => context.clientLoader.loadMany([
+                    [args.app_id, args.startDate, args.endDate]
+                ])
             },
             status: {
                 type: new GraphQLList(StatusType),
