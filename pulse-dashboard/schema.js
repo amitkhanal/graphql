@@ -2,6 +2,7 @@ const utils = require('./utils')
 
 const {
     GraphQLInt,
+    GraphQLFloat,
     GraphQLList,
     GraphQLObjectType,
     GraphQLSchema,
@@ -154,6 +155,13 @@ const ClientType = new GraphQLObjectType({
             resolve: (data, args, context) => context.searchLoader.load([
                 [data.app_id], data.startDate, data.endDate
             ])
+        },
+        transactionStat: {
+            type: new GraphQLList(TransactionStatType),
+            resolve: (data, args, context) => context.clientTransactionLoader.load([
+                [data.app_id], data.startDate, data.endDate
+            ])
+
         }
     })
 })
@@ -416,6 +424,29 @@ const TopSearchKeywordsStatType = new GraphQLObjectType({
     })
 })
 
+const TransactionStatType = new GraphQLObjectType({
+    name: 'TransactionStatType',
+    description: '...',
+
+    fields: () => ({
+        country: {
+            type: GraphQLString,
+            resolve: data => data.tr_country
+        },
+        device: {
+            type: GraphQLString,
+            resolve: data => data.dvce_type
+        },
+        count: {
+            type: GraphQLInt,
+            resolve: data => data.count
+        }, 
+        total: {
+            type: GraphQLFloat,
+            resolve: data => data.total
+        },
+    })
+})
 const StatusType = new GraphQLObjectType({
     name: 'Status',
     description: '...',

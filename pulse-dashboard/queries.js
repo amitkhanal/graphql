@@ -33,7 +33,9 @@ const queryTemplates = {
         'where e.event_id = s.root_id and e.app_id = ANY ($1) and e.derived_tstamp between ($2) and ($3) group by 1,2,3',
     newClientQueryTemplate: 'insert into public.kyc_oeclient_dim(oe_client_id, oe_client_name, oe_client_short_name, oe_client_city, oe_client_state,' +
         'oe_client_postal_code, oe_client_country, client_email) ' +
-        'values(${id},${name},${shortName},${city},${state},${postalCode},${country},${email}) RETURNING oe_client_id, oe_client_short_name'
+        'values(${id},${name},${shortName},${city},${state},${postalCode},${country},${email}) RETURNING oe_client_id, oe_client_short_name',
+    clientTransactionQueryTemplate: 'select tr_country, dvce_type, count(1), sum(tr_total) as total from atomic.events where app_id= ANY ($1) and derived_tstamp between '+
+    '($2) and ($3) and event=\'transaction\' group by tr_country, dvce_type'
 }
 
 const pgp = require('pg-promise')(pgPromiseOptions)
@@ -45,6 +47,8 @@ const pulseConfiguration = {
     user: process.env.db_user,
     password: process.env.db_password
 }
+
+const cacheTimeout = 10000
 
 const pulseDB = pgp(pulseConfiguration)
 
@@ -82,13 +86,29 @@ const statusQuery = startDate => {
         return cachedValue
     }
     return pulseDB.query(queryTemplates.statusQueryTemplate, [startDate]).then(response => {
-        let cacheLoaded = cache.set(cacheKey, response, 10000)
+        let cacheLoaded = cache.set(cacheKey, response, cacheTimeout)
         console.log("Cache loaded - " + cacheLoaded + " key - " + cacheKey)
         return response
     })
 }
 
 const statusLoader = new DataLoader(keys => Promise.all(keys.map(queryParam => statusQuery(queryParam[0])))) //.then(response => response))))
+
+const clientTransactionQuery = (app_ids, startDate, endDate) => {
+    let cacheKey = 'clientTransaction-' + app_ids.join() + '-'+startDate+'-'+endDate
+    let cachedValue = cache.get(cacheKey)
+    if (cachedValue != undefined) {
+        console.log("Found cache for " + cacheKey)
+        return cachedValue
+    }
+    return pulseDB.query(queryTemplates.clientTransactionQueryTemplate, [app_ids, startDate, endDate]).then(response => {
+        let cacheLoaded = cache.set(cacheKey, response, cacheTimeout)
+        console.log("Cache loaded - " + cacheLoaded + " key - " + cacheKey)
+        return response
+    })
+}
+
+const clientTransactionLoader = new DataLoader(keys => Promise.all(keys.map(queryParam => clientTransactionQuery(queryParam[0], queryParam[1], queryParam[2]))))
 
 const getClientsQuery = app_ids => {
     if (app_ids) {
@@ -122,7 +142,7 @@ const clientsQuery = (startDate, endDate, app_ids) => {
                         elem.endDate = endDate
                         return elem
                     })
-                    let cacheLoaded = cache.set(clientCacheKey, clientData, 10000)
+                    let cacheLoaded = cache.set(clientCacheKey, clientData, cacheTimeout)
                     console.log("Cache loaded - " + cacheLoaded + " key - " + clientCacheKey)
                     return clientData
                 }).catch(error => console.log(error))
@@ -143,7 +163,7 @@ const addToCartQuery = (app_ids, startDate, endDate) => {
     }
     return pulseDB.query(queryTemplates.addToCartQueryTemplate, [app_ids, startDate, endDate])
         .then(response => {
-            let cacheLoaded = cache.set(cacheKey, response, 10000)
+            let cacheLoaded = cache.set(cacheKey, response, cacheTimeout)
             console.log("Cache loaded - " + cacheLoaded + " key - " + cacheKey)
             return response
         })
@@ -160,7 +180,7 @@ const searchQuery = (app_ids, startDate, endDate) => {
     }
     return pulseDB.query(queryTemplates.searchQueryTemplate, [app_ids, startDate, endDate])
         .then(response => {
-            let cacheLoaded = cache.set(cacheKey, response, 10000)
+            let cacheLoaded = cache.set(cacheKey, response, cacheTimeout)
             console.log("Cache loaded - " + cacheLoaded + " key - " + cacheKey)
             return response
         })
@@ -174,5 +194,6 @@ module.exports = {
     clientsLoader,
     clientLoader,
     searchLoader,
-    newClientQuery
+    newClientQuery,
+    clientTransactionLoader
 }
