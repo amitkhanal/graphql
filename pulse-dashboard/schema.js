@@ -281,7 +281,7 @@ const AddToCartStatType = new GraphQLObjectType({
                         channelMap.set(element.sku, {
                             name: element.name,
                             category: element.category,
-                            price: element.unitPrice,
+                            price: element.unit_price,
                             count: +element.total
                         })
                     }
