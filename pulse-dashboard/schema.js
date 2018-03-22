@@ -134,7 +134,7 @@ const ClientType = new GraphQLObjectType({
                 }
             },
             resolve: (data, args) => {
-                let statMap = utils.getFilterdMap(data.stat, data.app_id, 'br_name', args.name)
+                let statMap = utils.getFilterdMap(data.stat, data.app_id, 'br_family', args.name)
                 return utils.mapToArray(statMap, args.threshold)
 
             }

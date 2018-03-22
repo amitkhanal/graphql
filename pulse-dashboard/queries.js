@@ -21,7 +21,7 @@ const pgPromiseOptions = {
 }
 
 const queryTemplates = {
-    clientDataQueryTemplate: 'select app_id, platform, tr_country, dvce_type, br_name, geo_region_name, count(1) from atomic.events ' +
+    clientDataQueryTemplate: 'select app_id, platform, tr_country, dvce_type, br_family, geo_region_name, count(1) from atomic.events ' +
         'where app_id = ANY ($1) and derived_tstamp between ($2) and ($3) group by 1,2,3,4,5,6',
     statusQueryTemplate: 'select * from atomic.manifest where to_char(commit_tstamp,\'yyyy-mm-dd\') >= ($1)',
     allClientsQueryTemplate: 'select app_id, count(1) as pageViews from atomic.events where derived_tstamp between ($1) and ($2) group by 1',
