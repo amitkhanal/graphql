@@ -86,7 +86,7 @@ const ClientType = new GraphQLObjectType({
     fields: () => ({
         app_id: {
             type: GraphQLString,
-            resolve: data => data.app_id
+            resolve: data => (data.app_id!=undefined || data.app_id!='')?data.app_id:'<N'
         },
         pageViews: {
             type: GraphQLInt,
@@ -190,6 +190,7 @@ const CountryStatType = new GraphQLObjectType({
                 }
             },
             resolve: data => utils.mapToArray(data.value.regions)
+                             .sort((elem1, elem2) => elem2.value - elem1.value)
         }
     })
 })
