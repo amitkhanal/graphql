@@ -86,7 +86,7 @@ const ClientType = new GraphQLObjectType({
     fields: () => ({
         app_id: {
             type: GraphQLString,
-            resolve: data => (data.app_id!=undefined || data.app_id!='')?data.app_id:'<N'
+            resolve: data => (data.app_id!=undefined && data.app_id!='' && data.app_id!=null)?data.app_id:'<<UNDEFINED_APP_ID>>'
         },
         pageViews: {
             type: GraphQLInt,
