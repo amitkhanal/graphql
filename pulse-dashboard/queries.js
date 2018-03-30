@@ -21,15 +21,15 @@ const pgPromiseOptions = {
 }
 
 const queryTemplates = {
-    clientDataQueryTemplate: 'select app_id, platform, tr_country, dvce_type, br_family, geo_region_name, count(1) from atomic.events ' +
+    clientDataQueryTemplate: 'select app_id, platform, geo_country, dvce_type, br_family, geo_region_name, count(1) from atomic.events ' +
         'where app_id = ANY ($1) and event=\'page_view\' and derived_tstamp between ($2) and ($3) group by 1,2,3,4,5,6',
     statusQueryTemplate: 'select * from atomic.manifest where to_char(commit_tstamp,\'yyyy-mm-dd\') >= ($1) order by commit_tstamp desc',
     allClientsQueryTemplate: 'select app_id, count(1) as pageViews from atomic.events where event=\'page_view\' and derived_tstamp between ($1) and ($2) group by 1',
     filteredClientsQueryTemplate: 'select app_id, count(1) as pageViews from atomic.events where event=\'page_view\' and derived_tstamp between ($1) and ($2) and app_id = ANY ($3) group by 1',
-    addToCartQueryTemplate: 'select count(1) as total, e.platform, a.sku, a.name, a.category, a.unit_price from' +
+    addToCartQueryTemplate: 'select count(1) as total, e.dvce_type, a.sku, a.name, a.category, a.unit_price from' +
         ' atomic.com_snowplowanalytics_snowplow_add_to_cart_1 a, atomic.events e where e.app_id = ANY ($1) and a.root_tstamp' +
         ' between ($2) and ($3) and e.event_id=a.root_id group by 2,3,4,5,6 order by total desc',
-    searchQueryTemplate: 'select e.platform, s.terms, s.total_results, count(1) as total from atomic.events e, com_snowplowanalytics_snowplow_site_search_1 s ' +
+    searchQueryTemplate: 'select e.dvce_type, s.terms, s.total_results, count(1) as total from atomic.events e, com_snowplowanalytics_snowplow_site_search_1 s ' +
         'where e.event_id = s.root_id and e.app_id = ANY ($1) and e.derived_tstamp between ($2) and ($3) group by 1,2,3',
     newClientQueryTemplate: 'insert into public.kyc_oeclient_dim(oe_client_id, oe_client_name, oe_client_short_name, oe_client_city, oe_client_state,' +
         'oe_client_postal_code, oe_client_country, client_email) ' +
@@ -88,7 +88,6 @@ const statusQuery = startDate => {
     return pulseDB.query(queryTemplates.statusQueryTemplate, [startDate]).then(response => {
         let cacheLoaded = cache.set(cacheKey, response, cacheTimeout)
         console.log("Cache loaded - " + cacheLoaded + " key - " + cacheKey)
-        console.log(JSON.stringify(response))
         return response
     })
 }
@@ -129,7 +128,7 @@ const clientsQuery = (startDate, endDate, app_ids) => {
     return pulseDB.query(
             getClientsQuery(app_ids), [startDate, endDate, app_ids])
         .then(response => {
-            let app_ids = response.map(elem => elem.app_id != null ? elem.app_id : '')
+            let app_ids = response.map(elem => elem.app_id != null ? elem.app_id : '<UNDEFINED_APP_ID>')
                 .filter((element, index, array) => index == array.indexOf(element))
 
 

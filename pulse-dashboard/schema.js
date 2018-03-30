@@ -1,4 +1,6 @@
 const utils = require('./utils')
+const countryNames = require('countrynames')
+const ld = require('lodash')
 
 const {
     GraphQLInt,
@@ -86,7 +88,7 @@ const ClientType = new GraphQLObjectType({
     fields: () => ({
         app_id: {
             type: GraphQLString,
-            resolve: data => (data.app_id!=undefined && data.app_id!='' && data.app_id!=null)?data.app_id:'<<UNDEFINED_APP_ID>>'
+            resolve: data => data.app_id
         },
         pageViews: {
             type: GraphQLInt,
@@ -104,8 +106,9 @@ const ClientType = new GraphQLObjectType({
             },
             resolve: (data, args, context) => {
                 //TODO make name and threshold to be handled via same function
-                let countryMap = utils.getFilterdMap(data.stat, data.app_id, 'tr_country', args.name)
+                let countryMap = utils.getFilterdMap(data.stat, data.app_id, 'geo_country', args.name)
                 return utils.mapToArray(countryMap, args.threshold)
+                       .sort((elem1, elem2) => elem2.value.count - elem1.value.count)
             }
         },
         deviceStat: {
@@ -173,7 +176,20 @@ const CountryStatType = new GraphQLObjectType({
     fields: () => ({
         country: {
             type: GraphQLString,
-            resolve: data => data.key
+            resolve: data => {
+                if (typeof data.key==undefined || data.key == null){
+                    return 'undefined'
+                }
+                let name = countryNames.getName(data.key)
+                if (typeof name==undefined || name == null){
+                    return 'undefined'
+                }
+                return countryNames.getName(data.key)
+                .toLowerCase()
+                .split(' ')
+                .map(word => word[0].toUpperCase() + word.substr(1))
+                .join(' ')
+            }
         },
         count: {
             type: GraphQLInt,
@@ -253,10 +269,10 @@ const AddToCartStatType = new GraphQLObjectType({
             resolve: data => {
                 let channelMap = new Map
                 data.forEach(element => {
-                    if (channelMap.has(element.platform)) {
-                        channelMap.set(element.platform, +channelMap.get(element.platform) + +element.total)
+                    if (channelMap.has(element.dvce_type)) {
+                        channelMap.set(element.dvce_type, +channelMap.get(element.dvce_type) + +element.total)
                     } else {
-                        channelMap.set(element.platform, +element.total)
+                        channelMap.set(element.dvce_type, +element.total)
                     }
                 })
                 return utils.mapToArray(channelMap)
@@ -304,7 +320,7 @@ const AddToCartChannelType = new GraphQLObjectType({
     description: '...',
 
     fields: () => ({
-        platform: {
+        device: {
             type: GraphQLString,
             resolve: data => data.key
         },
@@ -353,10 +369,10 @@ const SearchStatType = new GraphQLObjectType({
             resolve: (data) => {
                 let channelMap = new Map
                 data.forEach(element => {
-                    if (channelMap.has(element.platform)) {
-                        channelMap.set(element.platform, +channelMap.get(element.platform) + +element.total)
+                    if (channelMap.has(element.dvce_type)) {
+                        channelMap.set(element.dvce_type, +channelMap.get(element.dvce_type) + +element.total)
                     } else {
-                        channelMap.set(element.platform, +element.total)
+                        channelMap.set(element.dvce_type, +element.total)
                     }
                 })
                 return utils.mapToArray(channelMap)
@@ -399,7 +415,7 @@ const SearchChannelType = new GraphQLObjectType({
     description: '...',
 
     fields: () => ({
-        channel: {
+        device: {
             type: GraphQLString,
             resolve: data => data.key
         },
