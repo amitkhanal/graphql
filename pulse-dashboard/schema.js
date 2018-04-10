@@ -308,7 +308,7 @@ const AddToCartStatType = new GraphQLObjectType({
                     totalItemsToReturn = args.count
                 }
                 return utils.mapToArray(channelMap)
-                    .sort((elem1, elem2) => elem2.value - elem1.value)
+                    .sort((elem1, elem2) => elem2.value.count - elem1.value.count)
                     .slice(0, args.count)
             }
         }
